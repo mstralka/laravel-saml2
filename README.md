@@ -2,7 +2,7 @@
 
 [![Build Status](https://travis-ci.org/aacotroneo/laravel-saml2.svg)](https://travis-ci.org/aacotroneo/laravel-saml2)
 
-### this is a POC branch to remove mcrypt until everything is stable
+[check https://github.com/aacotroneo/laravel-saml2/tree/remove_mcrypt for a mcrypt free version ]
 
 A Laravel package for Saml2 integration as a SP (service provider) based on  [OneLogin](https://github.com/onelogin/php-saml) toolkit, which is much lighter and easier to install than simplesamlphp SP. It doesn't need separate routes or session storage to work!
 
@@ -76,6 +76,19 @@ When you want your user to login, just call `Saml2Auth::login()` or redirect to 
 	}
 ```
 
+Since Laravel 5.3, you can change your unauthenticated method in ```app/Exceptions/Handler.php```.
+```php
+protected function unauthenticated($request, AuthenticationException $exception)
+{
+	if ($request->expectsJson())
+        {
+            return response()->json(['error' => 'Unauthenticated.'], 401);
+        }
+
+        return Saml2Auth::login();
+}
+```
+
 The Saml2::login will redirect the user to the IDP and will came back to an endpoint the library serves at /saml2/acs. That will process the response and fire an event when ready. The next step for you is to handle that event. You just need to login the user or refuse.
 
 ```php
@@ -95,6 +108,38 @@ The Saml2::login will redirect the user to the IDP and will came back to an endp
         });
 
 ```
+### Auth persistence
+
+Becarefull about necessary Laravel middleware for Auth persistence in Session.
+
+For exemple, it can be:
+
+```
+# in App\Http\Kernel
+protected $middlewareGroups = [
+        'web' => [
+	    ...
+	],
+	'api' => [
+            ...
+        ],
+        'saml' => [
+            \App\Http\Middleware\EncryptCookies::class,
+            \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
+            \Illuminate\Session\Middleware\StartSession::class,
+        ],
+
+```
+
+And in `config/saml2_settings.php` :
+```
+    /**
+     * which middleware group to use for the saml routes
+     * Laravel 5.2 will need a group which includes StartSession
+     */
+    'routesMiddleware' => ['saml'],
+```
+
 ### Log out
 Now there are two ways the user can log out.
  + 1 - By logging out in your app: In this case you 'should' notify the IDP first so it closes global session.
